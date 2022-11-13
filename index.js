@@ -9,9 +9,11 @@ require('dotenv').config();
 app.use(cors());
 app.use(express.json())
 
-
-const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.nm1iekw.mongodb.net/?retryWrites=true&w=majority`;
+const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.niglu.mongodb.net/?retryWrites=true&w=majority`;
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
+
+// const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASSWORD}@cluster0.nm1iekw.mongodb.net/?retryWrites=true&w=majority`;
+// const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true, serverApi: ServerApiVersion.v1 });
 
 function verifyJWT(req, res, next){
   const authHeader = req.headers.authorization
@@ -34,7 +36,7 @@ function verifyJWT(req, res, next){
 
 const run = async () => {
   try {
-    const serviceCollection = client.db('geniusCar').collection('services');
+    const serviceCollection = client.db('geniusCar').collection('service');
     const orderCollection  = client.db('geniusCar').collection('orders')
 
 app.post('/jwt', (req, res) => {
@@ -42,13 +44,31 @@ app.post('/jwt', (req, res) => {
   const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1d'})
   res.send({token})
 })
+//To find all the data from servers 
+app.get('/services', async (req, res) => {
+  const search = req.query.search
+  console.log(search);
+  let query = {};
+  if (search.length) {
+      query = {
+          $text: {
+              $search: search
+          }
+      }
 
-    app.get('/services', async(req, res)=> {
-      const query = {}
-      const cursor = serviceCollection.find(query);
-      const services = await cursor.toArray();
-      res.send(services)
-    })
+  }
+  // const query = { price: { $gt: 100, $lt: 300 } }
+  // const query = { price: { $eq: 200 } }
+  // const query = { price: { $lte: 200 } }
+  // const query = { price: { $ne: 150 } }
+  // const query = { price: { $in: [20, 40, 150] } }
+  // const query = { price: { $nin: [20, 40, 150] } }
+  // const query = { $and: [{price: {$gt: 20}}, {price: {$gt: 100}}] }
+  const order = req.query.order === 'asc' ? 1 : -1;
+  const cursor = serviceCollection.find(query).sort({ price: order });
+  const services = await cursor.toArray();
+  res.send(services);
+});
 
     app.get('/services/:id', async(req, res)=> {
       const id = req.params.id;
@@ -59,7 +79,7 @@ app.post('/jwt', (req, res) => {
     //Orders API
 
     app.get('/orders', verifyJWT, async(req, res)=> {
-      const decoded = req.decoded; 
+      const decoded = req.decoded;
       console.log('Inside orders Api',decoded)
 
       if(decoded.email !== req.query.email){
